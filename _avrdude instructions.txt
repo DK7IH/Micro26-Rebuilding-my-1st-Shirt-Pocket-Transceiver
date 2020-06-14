@@ -1,0 +1,9 @@
+Upload FLASH: avrdude -p m328p -c usbtiny -U flash:w:"micro26.hex"
+Download FLASH: avrdude -p m328p -c usbtiny -U flash:r:"flash.hex":r
+
+Upload EEPROM: avrdude -p m328p -c usbtiny -U eeprom:w:"eeprom"
+Download EEPROM: avrdude -p m328p -c usbtiny -U eeprom:r:"eeprom":r
+
+8MHz+EESAVE: avrdude -c usbtiny -p m328p -U lfuse:w:0xe2:m -U hfuse:w:0xd1:m -U efuse:w:0xff:m 
+Ext. crystal EESAVE: avrdude -c usbtiny -p m328p -U lfuse:w:0xff:m -U hfuse:w:0xd2:m -U efuse:w:0xfd:m 
+
