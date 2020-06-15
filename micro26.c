@@ -37,6 +37,7 @@
 //9: TONE
 //10 AGC
 //11 Last memory used
+//12 Scan threshold
 //16:272: 16 MEM frequencies for 16 VFOs
 
 #include <inttypes.h>
@@ -55,7 +56,7 @@
  // Radio general Defines and Declarations   //
 //////////////////////////////////////////////
 #define MAXVFO 1
-#define MENUITEMS {3, 1, 3, 1, 1}
+#define MENUITEMS {3, 1, 3, 2, 1}
 
 //Bands, VFOs etc.
 int cur_band = 0;
@@ -76,7 +77,7 @@ int smax = 0;
 long runseconds10s = 0;
 
 //Interfrequency options
-#define IFOPTION 4
+#define IFOPTION 0
 
 #if (IFOPTION == 0) //9MHz Filter 9XMF24D (box73.de)
     #define INTERFREQUENCY 9000000
@@ -321,14 +322,17 @@ void store_tone(int);
 void store_agc(int);
 int recall_tone(void);
 int recall_agc(void);
+void store_scan_thresh(int);
+int recall_scan_thresh(void);
 
 //Memories
 void show_mem_menu_item(int, int);
-int mem_select(int);
+int mem_select(int, int);
 
 //SCAN
 int scan_memories(int);
 long scan_vfo(int);
+int set_scan_threshold(int);
 
 //Setting frequencies
 int calc_tuningfactor(void);
@@ -1135,6 +1139,7 @@ void adj_lo_frequency(int sb)
 int scan_memories(int thresh)
 {
 	int key = 0;
+	int sval;
     int m = 0;
     long runseconds10_scan = runseconds10, f_tmp;
         
@@ -1155,7 +1160,17 @@ int scan_memories(int thresh)
 			{
 				oled_putnumber(0, 7, 5 - (runseconds10 - runseconds10_scan) / 10, -1, 0, 0);;
 				key = get_keys();
-				show_meter(get_s_value());	
+				sval = get_s_value();
+				show_meter(sval);	
+				if(thresh) //Halt at this frequency as long as there is stronger signal
+		        {
+				    while(sval > thresh && !key)
+				    {
+					    sval = get_s_value();
+		                show_meter(sval);
+		                key = get_keys();
+		            }    
+		        } 
 			}	
 		}	
 		
@@ -1183,6 +1198,7 @@ long scan_vfo(int thresh)
 {
 	long f0, f1, f_tmp;
 	int key = 0;
+	int sval;
 	
 	f0 = f_vfo[0];
 	f1 = f_vfo[1];
@@ -1208,7 +1224,18 @@ long scan_vfo(int thresh)
 	    {	
 		    set_vfo_frequency(f_tmp + INTERFREQUENCY);
 		    show_frequency(f_tmp, 0);	
-		    show_meter(get_s_value());
+		    sval = get_s_value();
+		    show_meter(sval);
+		    
+		    if(thresh) //Halt at this frequency as long as there is stronger signal
+		    {
+				while(sval > thresh && !key)
+				{
+					sval = get_s_value();
+		            show_meter(sval);
+		            key = get_keys();
+		        }    
+		    }        
 	    	
 	        key = get_keys();
 	        if(key == 2)
@@ -1220,6 +1247,60 @@ long scan_vfo(int thresh)
 	
 	return -1;
 }
+
+//Define S-Value where scnanning halts
+int set_scan_threshold(int cur_thresh)
+{
+	int key = 0;
+	int l_thresh =  cur_thresh;
+	
+	while(get_keys());
+	
+	oled_putstring(0, 0, "SCAN THRESH", 0, 0);
+	//Draw bar graph
+    oled_write_section(0, l_thresh, 6, 0x1E);
+    oled_write_section(l_thresh, 128, 6, 0);
+    oled_putnumber(2 * FONTWIDTH, 4, l_thresh, -1, 0, 0);
+    
+	while(!get_keys())
+	{
+		if(tuningknob < -2)  
+		{    
+		    if(l_thresh < 100)
+		    {
+				l_thresh++;
+				//Draw bar graph
+                oled_write_section(0, l_thresh, 6, 0x1E);
+                oled_write_section(l_thresh, 128, 6, 0);
+                oled_putnumber(2 * FONTWIDTH, 4, l_thresh, -1, 0, 0);
+			}		 
+			tuningknob = 0;
+		}	
+		
+		if(tuningknob > 2)  
+		{    
+		    if(l_thresh > 0)
+		    {
+				l_thresh--;
+				//Draw bar graph
+                oled_write_section(0, l_thresh, 6, 0x1E);
+                oled_write_section(l_thresh, 128, 6, 0);
+                oled_putnumber(2 * FONTWIDTH, 4, l_thresh, -1, 0, 0);
+			}		 
+			tuningknob = 0;
+		}	
+		
+	    key = get_keys();    
+	    
+	    if(key == 2)
+	    {
+			store_scan_thresh(l_thresh);
+			return l_thresh;
+		}	
+	}
+	return -1;
+}	
+
 //Calc increment/decrement rate from tuning speed
 int calc_tuningfactor(void)
 {
@@ -1400,12 +1481,6 @@ void store_tone(int val)
 	eeprom_write_byte((uint8_t*)9, val); //TONE
 }	
 
-void store_agc(int val)
-{
-	eeprom_write_byte((uint8_t*)10, val); //AGC
-}	
-
-
 int recall_tone(void)
 {
 	int x =	eeprom_read_byte((uint8_t*)9); //TONE
@@ -1416,10 +1491,30 @@ int recall_tone(void)
 	return -1;	
 }	
 
+void store_agc(int val)
+{
+	eeprom_write_byte((uint8_t*)10, val); //AGC
+}	
+
 int recall_agc(void)
 {
 	int x =	eeprom_read_byte((uint8_t*)10); //AGC
 	if((x == 0) || (x == 1))
+	{
+		return x;
+	}
+	return -1;
+}	
+
+void store_scan_thresh(int val)
+{
+	eeprom_write_byte((uint8_t*)12, val); //SCAN THRESH
+}	
+
+int recall_scan_thresh(void)
+{
+	int x =	eeprom_read_byte((uint8_t*)12); //SCAN THRESH
+	if((x >= 0) && (x <= 100))
 	{
 		return x;
 	}
@@ -1540,10 +1635,10 @@ void print_menu_item_list(int m, int item, int invert)
 {
 	int menu_items[] =  MENUITEMS; 
 	
-	char *menu_str[5][4] =    {{"VFO A  ", "VFO B  ", "MEM SEL", "MEM QRG"}, 
+	char *menu_str[5][4] =    {{"VFO A  ", "VFO B  ", "VFO>MEM", "MEM>VFO"}, 
 		                       {"USB    ", "LSB    ", "       ", "       "},
 		                       {"TONE LO", "TONE HI", "AGC SLO", "AGC FST"},
-		                       {"MEMORY ", "VFOs   ", "       ", "       "},
+		                       {"MEMORY ", "VFOs   ", "THRESH ", "       "},
 		                       {"SET USB", "SET LSB", "       ", "       "}};
     int t1;
     
@@ -1611,7 +1706,11 @@ int navigate_thru_item_list(int m, int maxitems)
 				        {
 							set_vfo_frequency(f_vfo[menu_pos] + INTERFREQUENCY);
 				            oled_putnumber(10 * FONTWIDTH, 6, f_vfo[menu_pos] / 10, 2, 0, 0);    
-				        }    
+				        } 
+				        else   
+				        {
+							oled_putstring(10 * FONTWIDTH, 6, "________", 0, 0);    
+				        } 
 				        break;
 				case 1: set_lo_frequency(f_lo[menu_pos]);
 				        oled_putnumber(10 * FONTWIDTH, 6, f_lo[menu_pos] / 10, 2, 0, 0);    
@@ -1671,7 +1770,7 @@ void show_mem_menu_item(int m_item, int inv)
 		
 }	
 
-int mem_select(int c_mem)
+int mem_select(int c_mem, int smode)
 {
 	int t1;
 	int key = 0;
@@ -1682,7 +1781,14 @@ int mem_select(int c_mem)
 	while(get_keys());
 	oled_cls(0);
 	
-	oled_putstring(2, 0, "MEM SELECT", 0, 0);
+	if(!smode)
+	{
+	    oled_putstring(2, 0, "VFO -> MEM", 0, 0);
+	}
+	else    
+	{
+	    oled_putstring(2, 0, "MEM -> VFO", 0, 0);
+	}
 	
 	//Draw basic structure
 	for(t1 = 0; t1 < 16; t1++)
@@ -1700,6 +1806,7 @@ int mem_select(int c_mem)
 	}	
 	
 	key = get_keys();
+	show_mem_menu_item(c_mem, 1);
 	while(!key)
 	{
 		if(tuningknob < -2) //Turn CW
@@ -1759,7 +1866,7 @@ long menux(long f, int c_vfo)
 	////////////////
 	while(get_keys());
 	menu = 0;
-	print_menu_head("VFO", menu_items[menu]);	//Head outline of menu
+	print_menu_head("VFO/MEM", menu_items[menu]);	//Head outline of menu
 	print_menu_item_list(menu, -1, 0);              //Print item list in full
 	
 	//Navigate thru item list
@@ -1770,7 +1877,7 @@ long menux(long f, int c_vfo)
 	}
 	else
 	{
-		//Rset any changes
+		//Reset any changes
 		set_vfo_frequency(f_vfo[cur_vfo] + INTERFREQUENCY);
 		switch(result)
 		{				
@@ -1912,6 +2019,9 @@ int main(void)
     //Temprary freq
     long f_tmp = 0;
     
+    //Scan thresh
+    int scan_thresh = 0;
+    
 	//INPUT
 	PORTC = (1<<PC4) | (1<<PC5); //pullup Rs for I²C-Bus lines: PC4=SDA, PC5=SCL
     PORTC |= (1 << PC0); //Keys
@@ -1987,6 +2097,12 @@ int main(void)
 	{
 		cur_mem = 0;
 	}	
+	
+	scan_thresh = recall_scan_thresh();
+	if(scan_thresh == -1)
+	{
+		scan_thresh = 0;
+	}	
 		
     set_vfo_frequency(f_vfo[cur_vfo] + INTERFREQUENCY);
     set_lo_frequency(f_lo[sideband]);
@@ -2042,19 +2158,27 @@ int main(void)
 				set_vfo_frequency(f_vfo[cur_vfo] + INTERFREQUENCY);
 			}	
 			
-			if(rval == 2) //Select memory channel
+			if(rval == 2) //VFO >>> MEM
 			{
-				cur_mem = mem_select(cur_mem);
+				cur_mem = mem_select(cur_mem, 0);
+				if(cur_mem > -1)
+				{
+					store_frequency(f_vfo[cur_vfo], 0, cur_mem);
+				}	
 			}	
 			
-			if(rval == 3) //Recall frequency from current memory
+			if(rval == 3) //MEM >>> VFO
 			{
-				f_tmp = load_frequency(0, cur_mem);
-				if(is_mem_freq_ok(f_tmp))
+				cur_mem = mem_select(cur_mem, 1);
+				if(cur_mem > -1)
 				{
-					f_vfo[cur_vfo] = f_tmp;
-					set_vfo_frequency(f_vfo[cur_vfo] + INTERFREQUENCY);
-				}	
+					f_tmp = load_frequency(0, cur_mem);
+				    if(is_mem_freq_ok(f_tmp))
+				    {
+					     f_vfo[cur_vfo] = f_tmp;
+					     set_vfo_frequency(f_vfo[cur_vfo] + INTERFREQUENCY);
+				    }	
+				}   
 			}	
 						
 			if(rval == 10 || rval == 11) //New sideband selected (USB or LSB)
@@ -2080,7 +2204,7 @@ int main(void)
 			
 			if(rval == 30) //SCAN MEMORIES
 			{
-				t1 = scan_memories(0);
+				t1 = scan_memories(scan_thresh);
 				//oled_putnumber( 10, 7, t1, -1, 0, 0);
 				//_delay_ms(2000);
 				if(t1 != -1)
@@ -2097,7 +2221,7 @@ int main(void)
 		    
 		    if(rval == 31) //SCAN VFOs
 			{
-				f_tmp = scan_vfo(0);
+				f_tmp = scan_vfo(scan_thresh);
 				    
 				 if(is_mem_freq_ok(f_tmp))
 				 {
@@ -2106,9 +2230,17 @@ int main(void)
 				 }	
 		    }
 			
-			if(rval == 40 || rval == 41) //TONE
+			if(rval == 32) //Set scan threshold
 			{
-				adj_lo_frequency(rval - 30);
+				scan_thresh = set_scan_threshold(scan_thresh);
+				oled_putnumber(0, 5, scan_thresh, -1, 0, 0);
+				_delay_ms(2000);
+			}
+			
+			
+			if(rval == 40 || rval == 41) //LO FREQUENCIES
+			{
+				adj_lo_frequency(rval - 40);
 			}	
 							
 			key = 0;
