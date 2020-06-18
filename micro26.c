@@ -699,7 +699,7 @@ void draw_meter_scale(int meter_type)
     }
     else
     {
-        oled_putstring(0, 7, "0 1W 2W 3W 4W       ", 0, 0);
+        oled_putstring(0, 7, "0 1W  2W  3W  4W  5W", 0, 0);
     }
 }
 
@@ -1527,26 +1527,40 @@ int recall_scan_thresh(void)
 //
 //////////////////////////////
 //Read keys via ADC0
+//Short key press ret value 1 or 2
+//Long key press ret value 11 or 12
 int get_keys(void)
 {
 
     int key_value[] = {88, 143};
     int t1;
-    int adcval = get_adc(0);
-        
+            
     //TEST display of ADC value 
     /*
     oled_putstring(0, 5, "----", 0, 0);    
     oled_putnumber(0, 5, adcval, -1, 0, 0); 
     _delay_ms(100);   
    */
+   	long rsecs0;
    	
     for(t1 = 0; t1 < 2; t1++)
     {
-        if(adcval > key_value[t1] - 10 && adcval < key_value[t1] + 10)
+		if(get_adc(0) > key_value[t1] - 10 && get_adc(0) < key_value[t1] + 10)
         {
-			 //oled_putnumber(0, 5, t1 + 1, -1, 0, 0); 
-             return t1 + 1;
+			rsecs0 = runseconds10;
+			while(get_adc(0) > key_value[t1] - 10 && get_adc(0) < key_value[t1] + 10)
+			{
+				oled_putnumber(0, 6, (runseconds10 - rsecs0) / 10, -1, 0, 0);
+			};
+			
+			if(runseconds10 > rsecs0 + 20)
+			{
+                return t1 + 11;
+            }
+            else
+            {
+                return t1 + 1;
+            }    
         }
     }
     return 0;
@@ -1586,7 +1600,7 @@ int get_s_value(void)
 int get_tx_pwr_value(void)
 {
 	//oled_putnumber(0, 0, get_adc(3), -1, 0, 0);
-	return (get_adc(3));
+	return (get_adc(3) << 1);
 }	
 
 int get_txrx(void)
@@ -1723,13 +1737,21 @@ int navigate_thru_item_list(int m, int maxitems)
 		
 	while(get_keys());
 	
+	/*
+	oled_putstring(18, 6, "..", 0, 0);
+	oled_putnumber(18, 6, key, -1, 0, 0);
+	_delay_ms(1000);
+	*/
+	
 	switch(key)
-	{   case 1: return -1;       //Next menu!
+	{
+		case 1: return -1;
+	            break; 
+	    case 2: return menu_pos;
+	            break; 
+		case 11:return -11;
 		        break;
-	    case 2: return menu_pos; //OK
-	            break;
-	    case 3: return -3;       //Quit menu!
-	            break;
+	    default:return -1;
 	}
 	
 	return -1;
@@ -1844,14 +1866,16 @@ int mem_select(int c_mem, int smode)
 		key = get_keys();
 	}	
 	
-	if(key == 2)
+	switch(key)
 	{
-	    return c;
-	}
-	else
-	{
-		return -1;
-	}	
+		case 1: return -1;
+	            break; 
+	    case 2: return c;
+	            break; 
+		case 11:return -11;
+		        break;
+	    default:return -1;
+	 }
 }	
 			
 long menux(long f, int c_vfo)
@@ -1871,22 +1895,16 @@ long menux(long f, int c_vfo)
 	
 	//Navigate thru item list
 	result = navigate_thru_item_list(menu, menu_items[menu]);
-	if(result > -1)
-	{
-		return(menu * 10 + result);
+	switch(result)
+	{	
+		case -11:   return -3; //Quit menu         
+	                break;
+		case -1:    break;
+	    case 2:     return(menu * 10 + result);
+		            break;			
+	    
 	}
-	else
-	{
-		//Reset any changes
-		set_vfo_frequency(f_vfo[cur_vfo] + INTERFREQUENCY);
-		switch(result)
-		{				
-		    case -3: return -3; //Quit menu         
-		             break;
-		    case -1: break;
-		}
-    }		
-    
+	
 	////////////////
 	// SIDEBAND  //
 	////////////////
@@ -1897,21 +1915,15 @@ long menux(long f, int c_vfo)
 	
 	//Navigate thru item list
 	result = navigate_thru_item_list(menu, menu_items[menu]);
-	if(result > -1)
-	{
-		return(menu * 10 + result);
+	switch(result)
+	{	
+		case -11:   return -3; //Quit menu         
+	                break;
+		case -1:    break;
+	    case 2:     return(menu * 10 + result);
+		            break;			
+	    
 	}
-	else
-	{
-		set_lo_frequency(f_lo[sideband]);
-		switch(result)
-		{				
-		    case -3: return -3; //Quit menu         
-		             break;
-		    case -1: break;
-		}
-    }		
-    	        
 	
 	  //////////////////
 	 // TONE AGC SET //
@@ -1923,21 +1935,16 @@ long menux(long f, int c_vfo)
 	
 	//Navigate thru item list
 	result = navigate_thru_item_list(menu, menu_items[menu]);
-	if(result > -1)
-	{
-		return(menu * 10 + result);
+	switch(result)
+	{	
+		case -11:   return -3; //Quit menu         
+	                break;
+		case -1:    break;
+	    case 2:     return(menu * 10 + result);
+		            break;			
+	    
 	}
-	else
-	{
-		set_lo_frequency(f_lo[sideband]);
-		switch(result)
-		{				
-		    case -3: return -3; //Quit menu         
-		             break;
-		    case -1: break;
-		}
-    }		
-    
+	
     /////////////////
 	// SCAN MODES  //
 	/////////////////
@@ -1950,21 +1957,16 @@ long menux(long f, int c_vfo)
 	//Navigate thru item list
 	result = navigate_thru_item_list(menu, menu_items[menu]);
 					
-	if(result > -1)
-	{
-		return(menu * 10 + result);
+	switch(result)
+	{	
+		case -11:   return -3; //Quit menu         
+	                break;
+		case -1:    break;
+	    case 2:     return(menu * 10 + result);
+		            break;			
+	    
 	}
-	else
-	{
-		switch(result)
-		{	
-		    case -3: return -3; //Quit menu         
-		             break;
-		    case -1: break;
-		}
-    }
-    
-    
+	
 	/////////////////
 	// LO SET MODE //
 	/////////////////
@@ -1977,19 +1979,16 @@ long menux(long f, int c_vfo)
 	//Navigate thru item list
 	result = navigate_thru_item_list(menu, menu_items[menu]);
 					
-	if(result > -1)
-	{
-		return(menu * 10 + result);
+	switch(result)
+	{	
+		case -11:   return -3; //Quit menu         
+	                break;
+		case -1:    break;
+	    case 2:     return(menu * 10 + result);
+		            break;			
+	    
 	}
-	else
-	{
-		switch(result)
-		{	
-		    case -3: return -3; //Quit menu         
-		             break;
-		    case -1: break;
-		}
-    }
+	
     
 	return -2; //Nothing to do in main()
 }
