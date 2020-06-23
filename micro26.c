@@ -8,7 +8,7 @@
 /*                                                               */
 /*  Compiler:         GCC (GNU AVR C-Compiler)                   */
 /*  Author:           Peter Rachow (DK7IH)                       */
-/*  Last change:      JUL 2019                                   */
+/*  Last change:      2020-06-18                                 */
 /*****************************************************************/
 
 //PORTS
@@ -56,7 +56,7 @@
  // Radio general Defines and Declarations   //
 //////////////////////////////////////////////
 #define MAXVFO 1
-#define MENUITEMS {3, 1, 3, 2, 1}
+#define MENUITEMS {4, 1, 3, 2, 1, 1}
 
 //Bands, VFOs etc.
 int cur_band = 0;
@@ -282,6 +282,7 @@ void show_voltage(int);
 void show_temp(int);
 void show_tone(int, int);
 void show_agc(int, int);
+void show_split(int);
 void show_mem_num(int, int);
 void show_meter(int);
 void reset_smax(void);
@@ -946,6 +947,19 @@ void show_mem_num(int n, int invert)
 	oled_putnumber(xpos * FONTWIDTH, ypos, n, -1, 0, invert);
     
 }
+
+void show_split(int sp)
+{
+    int xpos = 0, ypos = 2;
+		
+	switch(sp)
+	{
+		case 0: oled_putstring(xpos * FONTWIDTH, ypos, "SPLT OFF", 0, 0);
+		        break;
+		case 1: oled_putstring(xpos * FONTWIDTH, ypos, "SPLT ON ", 0, 0);
+		        break;        
+    }
+}
     
 //S-Meter bargraph (Page 6)
 void show_meter(int sv0)
@@ -1529,6 +1543,7 @@ int recall_scan_thresh(void)
 //Read keys via ADC0
 //Short key press ret value 1 or 2
 //Long key press ret value 11 or 12
+/*
 int get_keys(void)
 {
 
@@ -1536,11 +1551,11 @@ int get_keys(void)
     int t1;
             
     //TEST display of ADC value 
-    /*
+   
     oled_putstring(0, 5, "----", 0, 0);    
     oled_putnumber(0, 5, adcval, -1, 0, 0); 
     _delay_ms(100);   
-   */
+   
    	long rsecs0;
    	
     for(t1 = 0; t1 < 2; t1++)
@@ -1550,21 +1565,45 @@ int get_keys(void)
 			rsecs0 = runseconds10;
 			while(get_adc(0) > key_value[t1] - 10 && get_adc(0) < key_value[t1] + 10)
 			{
-				oled_putnumber(0, 6, (runseconds10 - rsecs0) / 10, -1, 0, 0);
+				oled_putnumber(0, 7, (runseconds10 - rsecs0) / 10, -1, 0, 0);
 			};
 			
 			if(runseconds10 > rsecs0 + 20)
 			{
-                return t1 + 11;
+			    return t1 + 11;
             }
             else
             {
-                return t1 + 1;
+			    return t1 + 1;
             }    
         }
     }
     return 0;
+}*/
+
+//Read keys via ADC0
+int get_keys(void)
+{
+
+    int key_value[] = {88, 143};
+    int t1;
+    int adcval = get_adc(0);
+        
+    //TEST display of ADC value 
+    /*
+    lcd_putstring(0, 5, "    ", 0, 0);    
+    oled_putnumber(0, 5, adcval, -1, 0, 0);    
+   	*/
+    for(t1 = 0; t1 < 2; t1++)
+    {
+        if(adcval > key_value[t1] - 10 && adcval < key_value[t1] + 10)
+        {
+             return t1 + 1;
+        }
+    }
+    return 0;
 }
+
 
 //////////////////////
 //
@@ -1630,18 +1669,18 @@ int get_temp(void)
 //////////
 void print_menu_head(char *head_str0, int m_items)
 {	
-    int xpos0 = 3;
+    int xpos0 = 9;
 			
 	oled_cls(0);
-	oled_drawbox(1, 1, 53, m_items + 3);
-	oled_putstring(xpos0, 0, head_str0, 0, 0);
+	oled_drawbox(xpos0 * FONTWIDTH, 0, 18 * FONTWIDTH, m_items + 2);
+	oled_putstring(0 , 0, head_str0, 0, 0);
 }
 
 void print_menu_item(char *m_str, int ypos, int inverted)
 {
-	int xpos1= FONTWIDTH;
+	int xpos1= 10;
 	
-	oled_putstring(xpos1, ypos + 2, m_str, 0, inverted);
+	oled_putstring(xpos1  * FONTWIDTH, ypos + 1, m_str, 0, inverted);
 }
 	
 //Print the itemlist or single item
@@ -1649,11 +1688,12 @@ void print_menu_item_list(int m, int item, int invert)
 {
 	int menu_items[] =  MENUITEMS; 
 	
-	char *menu_str[5][4] =    {{"VFO A  ", "VFO B  ", "VFO>MEM", "MEM>VFO"}, 
-		                       {"USB    ", "LSB    ", "       ", "       "},
-		                       {"TONE LO", "TONE HI", "AGC SLO", "AGC FST"},
-		                       {"MEMORY ", "VFOs   ", "THRESH ", "       "},
-		                       {"SET USB", "SET LSB", "       ", "       "}};
+	char *menu_str[6][5] =    {{"VFO SWAP", "VFO B=A ", "VFO A=B ", "VFO>MEM ", "MEM>VFO "}, 
+		                       {"USB     ", "LSB     ", "        ", "        "},
+		                       {"TONE LO ", "TONE HI ", "AGC SLO ", "AGC FST "},
+		                       {"MEMORY  ", "VFOs    ", "THRESH  ", "        "},
+		                       {"SPLT OFF", "SPLT ON ", "        ", "        "},
+		                       {"SET USB ", "SET LSB ", "        ", "        "}};
     int t1;
     
     if(item == -1)
@@ -1716,18 +1756,11 @@ int navigate_thru_item_list(int m, int maxitems)
 		{
 			switch(m)
 			{
-				case 0: if(menu_pos < 2)
-				        {
-							set_vfo_frequency(f_vfo[menu_pos] + INTERFREQUENCY);
-				            oled_putnumber(10 * FONTWIDTH, 6, f_vfo[menu_pos] / 10, 2, 0, 0);    
-				        } 
-				        else   
-				        {
-							oled_putstring(10 * FONTWIDTH, 6, "________", 0, 0);    
-				        } 
+				case 0: oled_putnumber(0, 7, f_vfo[0] / 10, 2, 0, 0);    
+				        oled_putnumber(10 * FONTWIDTH, 7, f_vfo[1] / 10, 2, 0, 0);    
 				        break;
 				case 1: set_lo_frequency(f_lo[menu_pos]);
-				        oled_putnumber(10 * FONTWIDTH, 6, f_lo[menu_pos] / 10, 2, 0, 0);    
+				        oled_putnumber(0, 7, f_lo[menu_pos] / 10, 2, 0, 0);    
 				        break;      
 			}	         
 			menu_pos_old = menu_pos;
@@ -1736,13 +1769,7 @@ int navigate_thru_item_list(int m, int maxitems)
 	}
 		
 	while(get_keys());
-	
-	/*
-	oled_putstring(18, 6, "..", 0, 0);
-	oled_putnumber(18, 6, key, -1, 0, 0);
-	_delay_ms(1000);
-	*/
-	
+		
 	switch(key)
 	{
 		case 1: return -1;
@@ -1895,14 +1922,14 @@ long menux(long f, int c_vfo)
 	
 	//Navigate thru item list
 	result = navigate_thru_item_list(menu, menu_items[menu]);
+	if(result > -1)
+	{
+		return(menu * 10 + result);
+	}	
 	switch(result)
 	{	
-		case -11:   return -3; //Quit menu         
-	                break;
-		case -1:    break;
-	    case 2:     return(menu * 10 + result);
-		            break;			
-	    
+		case -11:   return -1; //Quit menu         
+	                break;   
 	}
 	
 	////////////////
@@ -1915,14 +1942,16 @@ long menux(long f, int c_vfo)
 	
 	//Navigate thru item list
 	result = navigate_thru_item_list(menu, menu_items[menu]);
+	
+	if(result > -1)
+	{
+		return(menu * 10 + result);
+	}	
+	
 	switch(result)
 	{	
-		case -11:   return -3; //Quit menu         
-	                break;
-		case -1:    break;
-	    case 2:     return(menu * 10 + result);
-		            break;			
-	    
+		case -11:   return -1; //Quit menu         
+	                break;   
 	}
 	
 	  //////////////////
@@ -1930,19 +1959,21 @@ long menux(long f, int c_vfo)
 	//////////////////
 	while(get_keys());
 	menu = 2;
-	print_menu_head("TONE/AGC SET", menu_items[menu]);	//Head outline of menu
+	print_menu_head("TONE/AGC", menu_items[menu]);	//Head outline of menu
 	print_menu_item_list(menu, -1, 0);              //Print item list in full
 	
 	//Navigate thru item list
 	result = navigate_thru_item_list(menu, menu_items[menu]);
+	
+	if(result > -1)
+	{
+		return(menu * 10 + result);
+	}	
+	
 	switch(result)
 	{	
-		case -11:   return -3; //Quit menu         
-	                break;
-		case -1:    break;
-	    case 2:     return(menu * 10 + result);
-		            break;			
-	    
+		case -11:   return -1; //Quit menu         
+	                break;   
 	}
 	
     /////////////////
@@ -1956,15 +1987,39 @@ long menux(long f, int c_vfo)
 	   
 	//Navigate thru item list
 	result = navigate_thru_item_list(menu, menu_items[menu]);
-					
+	
+	if(result > -1)
+	{
+		return(menu * 10 + result);
+	}	
+	
 	switch(result)
 	{	
-		case -11:   return -3; //Quit menu         
-	                break;
-		case -1:    break;
-	    case 2:     return(menu * 10 + result);
-		            break;			
-	    
+		case -11:   return -1; //Quit menu         
+	                break;   
+	}
+	
+	  /////////////////
+	 // SPLIT MODE  //
+	/////////////////
+	while(get_keys());
+	
+	menu = 4;
+	print_menu_head("SPLIT", menu_items[menu]);	//Head outline of menu
+	print_menu_item_list(menu, -1, 0);              //Print item list in full
+	   
+	//Navigate thru item list
+	result = navigate_thru_item_list(menu, menu_items[menu]);
+		
+	if(result > -1)
+	{
+		return(menu * 10 + result);
+	}	
+	
+	switch(result)
+	{	
+		case -11:   return -1; //Quit menu         
+	                break;   
 	}
 	
 	/////////////////
@@ -1972,21 +2027,23 @@ long menux(long f, int c_vfo)
 	/////////////////
 	while(get_keys());
 	
-	menu = 4;
+	menu = 5;
 	print_menu_head("LO FREQ", menu_items[menu]);	//Head outline of menu
 	print_menu_item_list(menu, -1, 0);              //Print item list in full
 	   
 	//Navigate thru item list
 	result = navigate_thru_item_list(menu, menu_items[menu]);
 					
+	
+	if(result > -1)
+	{
+		return(menu * 10 + result);
+	}	
+	
 	switch(result)
 	{	
-		case -11:   return -3; //Quit menu         
-	                break;
-		case -1:    break;
-	    case 2:     return(menu * 10 + result);
-		            break;			
-	    
+		case -11:   return -1; //Quit menu         
+	                break;   
 	}
 	
     
@@ -1999,6 +2056,7 @@ int main(void)
     int txrx = 0;
     int key = 0;
     int rval = 0;
+    int split = 0;
     
     long runseconds10x = 0;
     
@@ -2116,7 +2174,9 @@ int main(void)
     
     set_agc(agcset);
     show_agc(agcset, 0);
-    
+
+    show_split(split);
+        
     show_mem_num(cur_mem, 0);
     
     sei();
@@ -2149,35 +2209,48 @@ int main(void)
 		if(key == 1)
 		{
 			rval = menux(f_vfo[cur_vfo], cur_vfo);
+			while(get_keys());
 			oled_cls(0);
-			if(rval == 0 || rval == 1) //New VFO selected (A or B)
+			switch(rval)
 			{
-				cur_vfo = rval;
-				store_last_vfo(cur_vfo);
-				set_vfo_frequency(f_vfo[cur_vfo] + INTERFREQUENCY);
-			}	
-			
-			if(rval == 2) //VFO >>> MEM
-			{
-				cur_mem = mem_select(cur_mem, 0);
-				if(cur_mem > -1)
-				{
-					store_frequency(f_vfo[cur_vfo], 0, cur_mem);
-				}	
-			}	
-			
-			if(rval == 3) //MEM >>> VFO
-			{
-				cur_mem = mem_select(cur_mem, 1);
-				if(cur_mem > -1)
-				{
-					f_tmp = load_frequency(0, cur_mem);
-				    if(is_mem_freq_ok(f_tmp))
-				    {
-					     f_vfo[cur_vfo] = f_tmp;
-					     set_vfo_frequency(f_vfo[cur_vfo] + INTERFREQUENCY);
-				    }	
-				}   
+				case 0: if(cur_vfo) //0 = Swap VFOs
+				        {
+							cur_vfo = 0;
+						}
+						else
+						{
+							cur_vfo = 1;
+						}		
+						store_last_vfo(cur_vfo);
+				        set_vfo_frequency(f_vfo[cur_vfo] + INTERFREQUENCY);
+				        break;
+				 
+				 case 1:f_vfo[1] = f_vfo[0]; //B=A
+				        break;
+				 
+				 case 2:f_vfo[0] = f_vfo[1]; //A=B
+				        break;
+				                
+				 case 3:cur_mem = mem_select(cur_mem, 0);
+				        if(cur_mem > -1)
+				        {
+					        store_frequency(f_vfo[cur_vfo], 0, cur_mem);
+				        }	
+				        break;
+				
+				case 4: cur_mem = mem_select(cur_mem, 1); //MEM >>> VFO
+				        if(cur_mem > -1)
+				        {
+					        f_tmp = load_frequency(0, cur_mem);
+				            if(is_mem_freq_ok(f_tmp))
+				            {
+			 		            f_vfo[cur_vfo] = f_tmp;
+			 		            set_vfo_frequency(f_vfo[cur_vfo] + INTERFREQUENCY);
+			 		        }    
+					        
+				        }	
+				        break;
+				
 			}	
 						
 			if(rval == 10 || rval == 11) //New sideband selected (USB or LSB)
@@ -2201,6 +2274,7 @@ int main(void)
 				store_agc(agcset);
 			}	
 			
+						
 			if(rval == 30) //SCAN MEMORIES
 			{
 				t1 = scan_memories(scan_thresh);
@@ -2233,13 +2307,16 @@ int main(void)
 			{
 				scan_thresh = set_scan_threshold(scan_thresh);
 				oled_putnumber(0, 5, scan_thresh, -1, 0, 0);
-				_delay_ms(2000);
 			}
 			
-			
-			if(rval == 40 || rval == 41) //LO FREQUENCIES
+			if(rval >= 40 && rval <= 42) //Split
 			{
-				adj_lo_frequency(rval - 40);
+				split = rval - 40;
+			}	
+									
+			if(rval == 50 || rval == 51) //LO FREQUENCIES
+			{
+				adj_lo_frequency(rval - 50);
 			}	
 							
 			key = 0;
@@ -2256,6 +2333,7 @@ int main(void)
             show_txrx(txrx);
             show_tone(toneset, 0);
             show_agc(agcset, 0);
+            show_split(split);
             draw_meter_scale(0);	
 		}	
 		
@@ -2302,6 +2380,20 @@ int main(void)
 				show_meter(0);
 			    txrx = 1;
 				show_txrx(txrx);
+				
+				if(split)
+				{
+					if(!cur_vfo)
+					{
+						cur_vfo = 1;
+					}
+					else	
+					{
+						cur_vfo = 0;
+					}
+					set_vfo_frequency(f_vfo[cur_vfo] + INTERFREQUENCY);
+					show_frequency(f_vfo[cur_vfo], 1);
+				}	
 			}     
 		}
 		
@@ -2313,6 +2405,20 @@ int main(void)
 				show_meter(0);
 			    txrx = 0;
 				show_txrx(txrx);
+				
+				if(split)
+				{
+					if(!cur_vfo)
+					{
+						cur_vfo = 1;
+					}
+					else	
+					{
+						cur_vfo = 0;
+					}
+					set_vfo_frequency(f_vfo[cur_vfo] + INTERFREQUENCY);
+					show_frequency(f_vfo[cur_vfo], 1);
+				}	
 			}
 		}	
     }
