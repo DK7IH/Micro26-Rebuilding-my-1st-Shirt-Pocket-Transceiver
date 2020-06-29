@@ -13,6 +13,8 @@
 
 //PORTS
 //OUTPUT
+//PB1: AGC
+//PB2: Tone control
 
 //INPUT
 //PC0: ADC0: Pull-up for key switches with various resistors against GND 
@@ -81,8 +83,8 @@ long runseconds10s = 0;
 
 #if (IFOPTION == 0) //9MHz Filter 9XMF24D (box73.de)
     #define INTERFREQUENCY 9000000
-    #define F_LO_LSB 8998320
-    #define F_LO_USB 9001720
+    #define F_LO_LSB 8998600
+    #define F_LO_USB 9001700
 #endif  
   
 #if (IFOPTION == 1)  //10.695MHz Filter 10M04DS (ex CB TRX "President Jackson")
@@ -798,6 +800,7 @@ void show_frequency(long f, int refresh)
 {
 	char *buf;
 	int t1 = 0;
+	int ypos = 4;
 	
 	buf = malloc(10);
 	
@@ -824,7 +827,7 @@ void show_frequency(long f, int refresh)
 	{
 		if((*(oldbuf + t1) != *(buf + t1)) || refresh)
 		{
-		    oled_putchar2(15 + t1 * 12, 3, *(buf + t1), 0);
+		    oled_putchar2(15 + t1 * 12, ypos, *(buf + t1), 0);
 		}   
 	}	
 	
@@ -1121,7 +1124,15 @@ void adj_lo_frequency(int sb)
     //LO FREQ USB or LSB
 	key = 0;	
 	show_frequency(f_lo[sb], 1); 
-	oled_putstring(1, 5, "fBFO USB", 0, 0);
+	if(!sb)
+	{
+	    oled_putstring(1, 6, "fBFO USB", 0, 0);
+	}
+	else
+	{
+	    oled_putstring(1, 6, "fBFO LSB", 0, 0);
+	}
+	    
 	show_txrx(get_txrx());
 	set_lo_frequency(f_lo[sb]);
 	
